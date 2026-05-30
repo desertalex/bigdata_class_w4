@@ -21,29 +21,21 @@ type_indexer = StringIndexer(inputCol="type", outputCol="type_index", handleInva
 operator_indexer = StringIndexer(inputCol="operator", outputCol="operator_index", handleInvalid="skip")
 location_indexer = StringIndexer(inputCol="location", outputCol="location_index", handleInvalid="skip")
 
-# Step 5: One-Hot Encode each numerical index column individually
-type_encoder = OneHotEncoder(inputCol="type_index", outputCol="type_vec")
-operator_encoder = OneHotEncoder(inputCol="operator_index", outputCol="operator_vec")
-location_encoder = OneHotEncoder(inputCol="location_index", outputCol="location_vec")
+# Step 5: (Removed OneHotEncoder entirely to avoid Spark version compatibility errors)
 
-# Step 6: Assemble the encoded feature vectors into a single feature column vector
+# Step 6: Assemble the indexed numeric columns directly into a single feature vector
 assembler = VectorAssembler(
-    inputCols=["type_vec", "operator_vec", "location_vec"],
+    inputCols=["type_index", "operator_index", "location_index"],
     outputCol="features"
 )
 
-# Apply the transformations sequentially
+# Apply the StringIndexers sequentially to the DataFrame
 indexed_df = type_indexer.fit(crashes_df).transform(crashes_df)
 indexed_df = operator_indexer.fit(indexed_df).transform(indexed_df)
 indexed_df = location_indexer.fit(indexed_df).transform(indexed_df)
 
-# Execute the new individual encoders
-encoded_df = type_encoder.transform(indexed_df)
-encoded_df = operator_encoder.transform(encoded_df)
-encoded_df = location_encoder.transform(encoded_df)
-
-# Assemble everything into the final vector
-assembled_df = assembler.transform(encoded_df).select("features", "fat")
+# Feed the indexed features straight into the VectorAssembler
+assembled_df = assembler.transform(indexed_df).select("features", "fat")
 
 # Step 7: Split data into training (70%) and testing (30%) sets
 train_data, test_data = assembled_df.randomSplit([0.7, 0.3], seed=42)
